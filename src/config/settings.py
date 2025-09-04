@@ -9,7 +9,8 @@ import os
 from functools import lru_cache
 from typing import List, Optional
 
-from pydantic import BaseSettings, Field, validator
+from pydantic_settings import BaseSettings
+from pydantic import Field, validator
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -33,13 +34,13 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     
     # LLM Configuration
-    GEMINI_API_KEY: str = Field(..., env="GEMINI_API_KEY")
+    GEMINI_API_KEY: str = Field(default="", env="GEMINI_API_KEY")
     GEMINI_MODEL: str = Field(default="gemini-2.0-flash-exp", env="GEMINI_MODEL")
     GEMINI_MAX_TOKENS: int = Field(default=8192, env="GEMINI_MAX_TOKENS")
     GEMINI_TEMPERATURE: float = Field(default=0.1, env="GEMINI_TEMPERATURE")
     
     # E2B Sandbox Configuration
-    E2B_API_KEY: str = Field(..., env="E2B_API_KEY")
+    E2B_API_KEY: str = Field(default="", env="E2B_API_KEY")
     E2B_TEMPLATE_ID: str = Field(default="base", env="E2B_TEMPLATE_ID")
     E2B_SANDBOX_TIMEOUT: int = Field(default=3600, env="E2B_SANDBOX_TIMEOUT")
     

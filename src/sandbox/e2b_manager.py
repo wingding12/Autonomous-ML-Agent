@@ -13,10 +13,9 @@ from typing import Dict, List, Optional, Any, Union
 import json
 
 from e2b import Sandbox
-from e2b.sandbox.exception import SandboxException
 
-from ..config.settings import Settings
-from ..utils.logger import get_logger
+from config.settings import Settings
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -40,6 +39,7 @@ class E2BManager:
         self.sandbox_metadata: Dict[str, Dict[str, Any]] = {}
         
         # Initialize E2B
+        self.enabled: bool = False
         self._configure_e2b()
         
         logger.info("E2B Manager initialized")
@@ -47,9 +47,13 @@ class E2BManager:
     def _configure_e2b(self) -> None:
         """Configure E2B with API key."""
         try:
-            # E2B configuration would go here
-            # For now, we'll assume the API key is set via environment variable
-            logger.info("E2B configured successfully")
+            if not self.api_key:
+                self.enabled = False
+                logger.warning("E2B API key not set. Sandbox features are disabled.")
+                return
+            # The e2b package reads API key from env; here we just mark enabled
+            self.enabled = True
+            logger.info("E2B configured successfully and enabled")
         except Exception as e:
             logger.error(f"Failed to configure E2B: {e}")
             raise
@@ -93,16 +97,15 @@ class E2BManager:
             Sandbox ID
         """
         try:
+            if not self.enabled:
+                raise RuntimeError("E2B is disabled. Set E2B_API_KEY to enable sandboxes.")
             template = template_id or self.template_id
             sandbox_timeout = timeout or self.timeout
             
             logger.info(f"Creating E2B sandbox {sandbox_id} with template {template}")
             
-            # Create sandbox
-            sandbox = Sandbox(
-                template=template,
-                timeout=sandbox_timeout
-            )
+            # Create sandbox (v0.12 API)
+            sandbox = Sandbox(template=template, timeout=sandbox_timeout)
             
             # Store sandbox reference
             self.active_sandboxes[sandbox_id] = sandbox
@@ -131,6 +134,8 @@ class E2BManager:
             True if sandbox was terminated successfully
         """
         try:
+            if not self.enabled:
+                raise RuntimeError("E2B is disabled. Set E2B_API_KEY to enable sandboxes.")
             if sandbox_id not in self.active_sandboxes:
                 logger.warning(f"Sandbox {sandbox_id} not found")
                 return False
@@ -173,6 +178,8 @@ class E2BManager:
             Execution results
         """
         try:
+            if not self.enabled:
+                raise RuntimeError("E2B is disabled. Set E2B_API_KEY to enable sandboxes.")
             if sandbox_id not in self.active_sandboxes:
                 raise ValueError(f"Sandbox {sandbox_id} not found")
             
@@ -224,6 +231,8 @@ class E2BManager:
             True if upload was successful
         """
         try:
+            if not self.enabled:
+                raise RuntimeError("E2B is disabled. Set E2B_API_KEY to enable sandboxes.")
             if sandbox_id not in self.active_sandboxes:
                 raise ValueError(f"Sandbox {sandbox_id} not found")
             
@@ -268,6 +277,8 @@ class E2BManager:
             True if download was successful
         """
         try:
+            if not self.enabled:
+                raise RuntimeError("E2B is disabled. Set E2B_API_KEY to enable sandboxes.")
             if sandbox_id not in self.active_sandboxes:
                 raise ValueError(f"Sandbox {sandbox_id} not found")
             
@@ -303,6 +314,8 @@ class E2BManager:
             List of file information
         """
         try:
+            if not self.enabled:
+                raise RuntimeError("E2B is disabled. Set E2B_API_KEY to enable sandboxes.")
             if sandbox_id not in self.active_sandboxes:
                 raise ValueError(f"Sandbox {sandbox_id} not found")
             
@@ -337,6 +350,8 @@ class E2BManager:
             Sandbox status information
         """
         try:
+            if not self.enabled:
+                raise RuntimeError("E2B is disabled. Set E2B_API_KEY to enable sandboxes.")
             if sandbox_id not in self.active_sandboxes:
                 raise ValueError(f"Sandbox {sandbox_id} not found")
             
@@ -410,9 +425,13 @@ class E2BManager:
             
             logger.info(f"Installing package {package_spec} in sandbox {sandbox_id}")
             
-            # Install package
+            # Install package using python -m pip to avoid shell specifics
+            install_code = (
+                "import sys, subprocess;\n"
+                f"subprocess.run([sys.executable, '-m', 'pip', 'install', '{package_spec}'], check=False)\n"
+            )
             result = await sandbox.run_python(
-                f"!pip install {package_spec}",
+                install_code,
                 timeout=300
             )
             

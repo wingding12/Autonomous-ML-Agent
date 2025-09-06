@@ -10,12 +10,10 @@ import logging
 from typing import Dict, List, Optional, Any, Union
 import json
 
-import google.generativeai as genai
-from google.generativeai.types import GenerateContentResponse
-from google.generativeai.types.content_types import ContentType
+from typing import Any as GenerateContentResponse  # fallback alias when types unavailable
 
-from ..config.settings import Settings
-from ..utils.logger import get_logger
+from config.settings import Settings
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -36,7 +34,9 @@ class GeminiClient:
         self.temperature = settings.GEMINI_TEMPERATURE
         
         # Initialize Gemini
-        genai.configure(api_key=self.api_key)
+        self.enabled: bool = bool(self.api_key)
+        if not self.enabled:
+            logger.warning("GEMINI_API_KEY not set. LLM features are disabled.")
         self.model = None
         self.is_initialized = False
         
@@ -45,7 +45,12 @@ class GeminiClient:
     async def initialize(self) -> None:
         """Initialize the Gemini client."""
         try:
+            if not self.enabled:
+                raise RuntimeError("Gemini is disabled. Set GEMINI_API_KEY to enable LLM features.")
             # Get the model
+            # Lazy import to avoid hard dependency when disabled
+            from google import genai  # type: ignore
+            genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel(
                 model_name=self.model_name,
                 generation_config={
@@ -206,10 +211,13 @@ class GeminiClient:
         try:
             # Use asyncio to run the synchronous Gemini call
             loop = asyncio.get_event_loop()
+            # Lazy import module only when enabled to avoid import errors
+            if not self.enabled or not self.model:
+                raise RuntimeError("Gemini is disabled or not initialized")
             response = await loop.run_in_executor(
-                None, 
-                self.model.generate_content, 
-                prompt
+                None,
+                self.model.generate_content,
+                prompt,
             )
             
             return response
